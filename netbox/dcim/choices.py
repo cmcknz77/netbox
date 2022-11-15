@@ -850,6 +850,8 @@ class InterfaceTypeChoices(ChoiceSet):
     TYPE_10G_EPON = '10g-epon'
 
     # Stacking
+    TYPE_ARUBA29XXSTACK = 'aruba-29xx-stack'
+    TYPE_ARUBA38XXSTACK = 'aruba-38xx-stack'
     TYPE_STACKWISE = 'cisco-stackwise'
     TYPE_STACKWISE_PLUS = 'cisco-stackwise-plus'
     TYPE_FLEXSTACK = 'cisco-flexstack'
@@ -1007,6 +1009,8 @@ class InterfaceTypeChoices(ChoiceSet):
         (
             'Stacking',
             (
+                (TYPE_ARUBA29XXSTACK, 'Aruba 2920/2930 Stack'),
+                (TYPE_ARUBA38XXSTACK, 'Aruba 3800/3810 Stack'),
                 (TYPE_STACKWISE, 'Cisco StackWise'),
                 (TYPE_STACKWISE_PLUS, 'Cisco StackWise Plus'),
                 (TYPE_FLEXSTACK, 'Cisco FlexStack'),
