@@ -116,6 +116,7 @@
       {% plugin_left_page object %}
     </div>
     <div class="col col-md-6">
+      {% include 'inc/panel_table.html' with table=vdc_table heading="Virtual Device Contexts" %}
       <div class="card">
         <h5 class="card-header">Addressing</h5>
         <div class="card-body">
@@ -144,7 +145,7 @@
                 <span class="text-success"><i class="mdi mdi-check-bold"></i></span> Marked as Connected
               </div>
             {% elif object.cable %}
-              {% include 'dcim/inc/connection_endpoints.html' %}
+              {% include 'dcim/inc/connection_endpoints.html' with trace_url='dcim:interface_trace' %}
             {% elif object.wireless_link %}
               <table class="table table-hover">
                 <tr>
@@ -210,7 +211,7 @@
         <div class="card">
           <h5 class="card-header">Wireless</h5>
           <div class="card-body">
-            {% with peer=object.connected_endpoint %}
+            {% with peer=object.connected_endpoints.0 %}
               <table class="table table-hover">
                 <thead>
                   <tr>

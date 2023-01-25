@@ -55,14 +55,18 @@ class RackTypeChoices(ChoiceSet):
     TYPE_4POST = '4-post-frame'
     TYPE_CABINET = '4-post-cabinet'
     TYPE_WALLFRAME = 'wall-frame'
+    TYPE_WALLFRAME_VERTICAL = 'wall-frame-vertical'
     TYPE_WALLCABINET = 'wall-cabinet'
+    TYPE_WALLCABINET_VERTICAL = 'wall-cabinet-vertical'
 
     CHOICES = (
         (TYPE_2POST, '2-post frame'),
         (TYPE_4POST, '4-post frame'),
         (TYPE_CABINET, '4-post cabinet'),
         (TYPE_WALLFRAME, 'Wall-mounted frame'),
+        (TYPE_WALLFRAME_VERTICAL, 'Wall-mounted frame (vertical)'),
         (TYPE_WALLCABINET, 'Wall-mounted cabinet'),
+        (TYPE_WALLCABINET_VERTICAL, 'Wall-mounted cabinet (vertical)'),
     )
 
 
@@ -192,6 +196,30 @@ class DeviceAirflowChoices(ChoiceSet):
         (AIRFLOW_PASSIVE, 'Passive'),
         (AIRFLOW_MIXED, 'Mixed'),
     )
+
+
+#
+# Modules
+#
+
+class ModuleStatusChoices(ChoiceSet):
+    key = 'Module.status'
+
+    STATUS_OFFLINE = 'offline'
+    STATUS_ACTIVE = 'active'
+    STATUS_PLANNED = 'planned'
+    STATUS_STAGED = 'staged'
+    STATUS_FAILED = 'failed'
+    STATUS_DECOMMISSIONING = 'decommissioning'
+
+    CHOICES = [
+        (STATUS_OFFLINE, 'Offline', 'gray'),
+        (STATUS_ACTIVE, 'Active', 'green'),
+        (STATUS_PLANNED, 'Planned', 'cyan'),
+        (STATUS_STAGED, 'Staged', 'blue'),
+        (STATUS_FAILED, 'Failed', 'red'),
+        (STATUS_DECOMMISSIONING, 'Decommissioning', 'yellow'),
+    ]
 
 
 #
@@ -757,7 +785,10 @@ class InterfaceTypeChoices(ChoiceSet):
     TYPE_LAG = 'lag'
 
     # Ethernet
+    TYPE_100ME_FX = '100base-fx'
+    TYPE_100ME_LFX = '100base-lfx'
     TYPE_100ME_FIXED = '100base-tx'
+    TYPE_100ME_T1 = '100base-t1'
     TYPE_1GE_FIXED = '1000base-t'
     TYPE_1GE_GBIC = '1000base-x-gbic'
     TYPE_1GE_SFP = '1000base-x-sfp'
@@ -782,6 +813,19 @@ class InterfaceTypeChoices(ChoiceSet):
     TYPE_200GE_QSFP56 = '200gbase-x-qsfp56'
     TYPE_400GE_QSFP_DD = '400gbase-x-qsfpdd'
     TYPE_400GE_OSFP = '400gbase-x-osfp'
+    TYPE_800GE_QSFP_DD = '800gbase-x-qsfpdd'
+    TYPE_800GE_OSFP = '800gbase-x-osfp'
+
+    # Ethernet Backplane
+    TYPE_1GE_KX = '1000base-kx'
+    TYPE_10GE_KR = '10gbase-kr'
+    TYPE_10GE_KX4 = '10gbase-kx4'
+    TYPE_25GE_KR = '25gbase-kr'
+    TYPE_40GE_KR4 = '40gbase-kr4'
+    TYPE_50GE_KR = '50gbase-kr'
+    TYPE_100GE_KP4 = '100gbase-kp4'
+    TYPE_100GE_KR2 = '100gbase-kr2'
+    TYPE_100GE_KR4 = '100gbase-kr4'
 
     # Wireless
     TYPE_80211A = 'ieee802.11a'
@@ -881,7 +925,10 @@ class InterfaceTypeChoices(ChoiceSet):
         (
             'Ethernet (fixed)',
             (
+                (TYPE_100ME_FX, '100BASE-FX (10/100ME FIBER)'),
+                (TYPE_100ME_LFX, '100BASE-LFX (10/100ME FIBER)'),
                 (TYPE_100ME_FIXED, '100BASE-TX (10/100ME)'),
+                (TYPE_100ME_T1, '100BASE-T1 (10/100ME Single Pair)'),
                 (TYPE_1GE_FIXED, '1000BASE-T (1GE)'),
                 (TYPE_2GE_FIXED, '2.5GBASE-T (2.5GE)'),
                 (TYPE_5GE_FIXED, '5GBASE-T (5GE)'),
@@ -911,6 +958,22 @@ class InterfaceTypeChoices(ChoiceSet):
                 (TYPE_200GE_QSFP56, 'QSFP56 (200GE)'),
                 (TYPE_400GE_QSFP_DD, 'QSFP-DD (400GE)'),
                 (TYPE_400GE_OSFP, 'OSFP (400GE)'),
+                (TYPE_800GE_QSFP_DD, 'QSFP-DD (800GE)'),
+                (TYPE_800GE_OSFP, 'OSFP (800GE)'),
+            )
+        ),
+        (
+            'Ethernet (backplane)',
+            (
+                (TYPE_1GE_KX, '1000BASE-KX (1GE)'),
+                (TYPE_10GE_KR, '10GBASE-KR (10GE)'),
+                (TYPE_10GE_KX4, '10GBASE-KX4 (10GE)'),
+                (TYPE_25GE_KR, '25GBASE-KR (25GE)'),
+                (TYPE_40GE_KR4, '40GBASE-KR4 (40GE)'),
+                (TYPE_50GE_KR, '50GBASE-KR (50GE)'),
+                (TYPE_100GE_KP4, '100GBASE-KP4 (100GE)'),
+                (TYPE_100GE_KR2, '100GBASE-KR2 (100GE)'),
+                (TYPE_100GE_KR4, '100GBASE-KR4 (100GE)'),
             )
         ),
         (
@@ -1318,6 +1381,24 @@ class CableLengthUnitChoices(ChoiceSet):
     )
 
 
+class WeightUnitChoices(ChoiceSet):
+
+    # Metric
+    UNIT_KILOGRAM = 'kg'
+    UNIT_GRAM = 'g'
+
+    # Imperial
+    UNIT_POUND = 'lb'
+    UNIT_OUNCE = 'oz'
+
+    CHOICES = (
+        (UNIT_KILOGRAM, 'Kilograms'),
+        (UNIT_GRAM, 'Grams'),
+        (UNIT_POUND, 'Pounds'),
+        (UNIT_OUNCE, 'Ounces'),
+    )
+
+
 #
 # CableTerminations
 #
@@ -1385,3 +1466,20 @@ class PowerFeedPhaseChoices(ChoiceSet):
         (PHASE_SINGLE, 'Single phase'),
         (PHASE_3PHASE, 'Three-phase'),
     )
+
+
+#
+# VDC
+#
+class VirtualDeviceContextStatusChoices(ChoiceSet):
+    key = 'VirtualDeviceContext.status'
+
+    STATUS_ACTIVE = 'active'
+    STATUS_PLANNED = 'planned'
+    STATUS_OFFLINE = 'offline'
+
+    CHOICES = [
+        (STATUS_ACTIVE, 'Active', 'green'),
+        (STATUS_PLANNED, 'Planned', 'cyan'),
+        (STATUS_OFFLINE, 'Offline', 'red'),
+    ]

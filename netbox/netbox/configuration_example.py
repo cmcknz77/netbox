@@ -31,12 +31,15 @@ REDIS = {
         # Comment out `HOST` and `PORT` lines and uncomment the following if using Redis Sentinel
         # 'SENTINELS': [('mysentinel.redis.example.com', 6379)],
         # 'SENTINEL_SERVICE': 'netbox',
+        'USERNAME': '',
         'PASSWORD': '',
         'DATABASE': 0,
         'SSL': False,
         # Set this to True to skip TLS certificate verification
         # This can expose the connection to attacks, be careful
         # 'INSECURE_SKIP_TLS_VERIFY': False,
+        # Set a path to a certificate authority, typically used with a self signed certificate.
+        # 'CA_CERT_PATH': '/etc/ssl/certs/ca.crt',
     },
     'caching': {
         'HOST': 'localhost',
@@ -44,12 +47,15 @@ REDIS = {
         # Comment out `HOST` and `PORT` lines and uncomment the following if using Redis Sentinel
         # 'SENTINELS': [('mysentinel.redis.example.com', 6379)],
         # 'SENTINEL_SERVICE': 'netbox',
+        'USERNAME': '',
         'PASSWORD': '',
         'DATABASE': 1,
         'SSL': False,
         # Set this to True to skip TLS certificate verification
         # This can expose the connection to attacks, be careful
         # 'INSECURE_SKIP_TLS_VERIFY': False,
+        # Set a path to a certificate authority, typically used with a self signed certificate.
+        # 'CA_CERT_PATH': '/etc/ssl/certs/ca.crt',
     }
 }
 
@@ -71,6 +77,9 @@ SECRET_KEY = ''
 ADMINS = [
     # ('John Doe', 'jdoe@example.com'),
 ]
+
+# Permit the retrieval of API tokens after their creation.
+ALLOW_TOKEN_RETRIEVAL = False
 
 # Enable any desired validators for local account passwords below. For a list of included validators, please see the
 # Django documentation at https://docs.djangoproject.com/en/stable/topics/auth/passwords/#password-validation.
@@ -102,6 +111,9 @@ CORS_ORIGIN_REGEX_WHITELIST = [
 # sensitive information about your installation. Only enable debugging while performing testing. Never enable debugging
 # on a production system.
 DEBUG = False
+
+# Set the default preferred language/locale
+DEFAULT_LANGUAGE = 'en-us'
 
 # Email settings
 EMAIL = {
@@ -148,6 +160,9 @@ LOGIN_REQUIRED = False
 # The length of time (in seconds) for which a user will remain logged into the web UI before being prompted to
 # re-authenticate. (Default: 1209600 [14 days])
 LOGIN_TIMEOUT = None
+
+# The view name or URL to which users are redirected after logging out.
+LOGOUT_REDIRECT_URL = 'home'
 
 # The file path where uploaded media such as image attachments are stored. A trailing slash is not needed. Note that
 # the default value of this setting is derived from the installed location.
@@ -212,6 +227,9 @@ SESSION_COOKIE_NAME = 'sessionid'
 # local file storage instead. (This can be useful for enabling authentication on a standby instance with read-only
 # database access.) Note that the user as which NetBox runs must have read and write permissions to this path.
 SESSION_FILE_PATH = None
+
+# Localization
+ENABLE_LOCALIZATION = False
 
 # Time zone (default: UTC)
 TIME_ZONE = 'UTC'

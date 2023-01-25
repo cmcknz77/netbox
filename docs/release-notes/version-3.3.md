@@ -1,9 +1,73 @@
 # NetBox v3.3
 
-## v3.3.8 (FUTURE)
+## v3.3.10 (2022-12-13)
+
+### Enhancements
+
+* [#9361](https://github.com/netbox-community/netbox/issues/9361) - Add replication controls for module bulk import
+* [#10255](https://github.com/netbox-community/netbox/issues/10255) - Introduce `LOGOUT_REDIRECT_URL` config parameter to control redirection of user after logout
+* [#10447](https://github.com/netbox-community/netbox/issues/10447) - Enable reassigning an inventory item from one device to another
+* [#10516](https://github.com/netbox-community/netbox/issues/10516) - Add vertical frame & cabinet rack types
+* [#10748](https://github.com/netbox-community/netbox/issues/10748) - Add provider selection field for provider networks to circuit termination edit view
+* [#11089](https://github.com/netbox-community/netbox/issues/11089) - Permit whitespace in MAC addresses
+* [#11119](https://github.com/netbox-community/netbox/issues/11119) - Enable filtering L2VPNs by slug
 
 ### Bug Fixes
 
+* [#11041](https://github.com/netbox-community/netbox/issues/11041) - Correct power utilization percentage precision
+* [#11077](https://github.com/netbox-community/netbox/issues/11077) - Honor configured date format when displaying date custom field values in tables
+* [#11087](https://github.com/netbox-community/netbox/issues/11087) - Fix background color of bottom banner content
+* [#11101](https://github.com/netbox-community/netbox/issues/11101) - Correct circuits count under site view
+* [#11109](https://github.com/netbox-community/netbox/issues/11109) - Fix nullification of custom object & multi-object fields via REST API
+* [#11128](https://github.com/netbox-community/netbox/issues/11128) - Disable ordering changelog table by object to avoid exception
+* [#11142](https://github.com/netbox-community/netbox/issues/11142) - Correct available choices for status under IP range filter form
+* [#11168](https://github.com/netbox-community/netbox/issues/11168) - Honor `RQ_DEFAULT_TIMEOUT` config parameter when using Redis Sentinel
+* [#11173](https://github.com/netbox-community/netbox/issues/11173) - Enable missing tags columns for contact, L2VPN lists
+
+---
+
+## v3.3.9 (2022-11-30)
+
+### Enhancements
+
+* [#10653](https://github.com/netbox-community/netbox/issues/10653) - Ensure logging of failed login attempts
+
+### Bug Fixes
+
+* [#6389](https://github.com/netbox-community/netbox/issues/6389) - Call `snapshot()` on object when processing deletions
+* [#9223](https://github.com/netbox-community/netbox/issues/9223) - Fix serialization of array field values in change log
+* [#9878](https://github.com/netbox-community/netbox/issues/9878) - Fix spurious error message when rendering REST API docs
+* [#10236](https://github.com/netbox-community/netbox/issues/10236) - Fix TypeError exception when viewing PDU configured for three-phase power
+* [#10241](https://github.com/netbox-community/netbox/issues/10241) - Support referencing custom field related objects by attribute in addition to PK
+* [#10579](https://github.com/netbox-community/netbox/issues/10579) - Mark cable traces terminating to a provider network as complete
+* [#10721](https://github.com/netbox-community/netbox/issues/10721) - Disable ordering by custom object field columns
+* [#10929](https://github.com/netbox-community/netbox/issues/10929) - Raise validation error when attempting to create a duplicate cable termination
+* [#10936](https://github.com/netbox-community/netbox/issues/10936) - Permit demotion of device/VM primary IP via IP address edit form
+* [#10938](https://github.com/netbox-community/netbox/issues/10938) - `render_field` template tag should respect `label` kwarg
+* [#10969](https://github.com/netbox-community/netbox/issues/10969) - Update cable paths ending at associated rear port when creating new front ports
+* [#10996](https://github.com/netbox-community/netbox/issues/10996) - Hide checkboxes on child object lists when no bulk operations are available
+* [#10997](https://github.com/netbox-community/netbox/issues/10997) - Fix exception when editing NAT IP for VM with no cluster
+* [#11014](https://github.com/netbox-community/netbox/issues/11014) - Use natural ordering when sorting rack elevations by name
+* [#11028](https://github.com/netbox-community/netbox/issues/11028) - Enable bulk clearing of color attribute of pass-through ports
+* [#11047](https://github.com/netbox-community/netbox/issues/11047) - Cloning a rack reservation should replicate rack & user
+
+---
+
+## v3.3.8 (2022-11-16)
+
+### Enhancements
+
+* [#10356](https://github.com/netbox-community/netbox/issues/10356) - Add backplane Ethernet interface types
+* [#10902](https://github.com/netbox-community/netbox/issues/10902) - Add location selector to power feed form
+* [#10904](https://github.com/netbox-community/netbox/issues/10904) - Use front/rear port colors in cable trace SVG
+* [#10914](https://github.com/netbox-community/netbox/issues/10914) - Include "add module type" button on manufacturer view
+* [#10915](https://github.com/netbox-community/netbox/issues/10915) - Add count of L2VPNs to tenant view
+* [#10919](https://github.com/netbox-community/netbox/issues/10919) - Include device location under cable view
+* [#10920](https://github.com/netbox-community/netbox/issues/10920) - Include request cookies when queuing a custom script
+
+### Bug Fixes
+
+* [#9439](https://github.com/netbox-community/netbox/issues/9439) - Ensure thread safety of change logging functions
 * [#10709](https://github.com/netbox-community/netbox/issues/10709) - Correct UI display for `azuread-v2-tenant-oauth2` SSO backend
 * [#10829](https://github.com/netbox-community/netbox/issues/10829) - Fix bulk edit/delete buttons ad top of object lists
 * [#10837](https://github.com/netbox-community/netbox/issues/10837) - Correct cookie paths when `BASE_PATH` is set
@@ -414,7 +478,7 @@ Custom field UI visibility has no impact on API operation.
     * The `cluster` field is now optional. A virtual machine must have a site and/or cluster assigned.
     * Added the optional `device` field
     * Added the `l2vpn_termination` read-only field
-wireless.WirelessLAN
+* wireless.WirelessLAN
     * Added `tenant` field
-wireless.WirelessLink
+* wireless.WirelessLink
     * Added `tenant` field
