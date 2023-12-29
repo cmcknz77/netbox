@@ -8,19 +8,20 @@ from itertools import count, groupby
 import bleach
 from django.contrib.contenttypes.models import ContentType
 from django.core import serializers
-from django.db.models import Count, OuterRef, Subquery
+from django.db.models import Count, ManyToOneRel, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.http import QueryDict
-from django.utils.html import escape
 from django.utils import timezone
+from django.utils.datastructures import MultiValueDict
+from django.utils.html import escape
 from django.utils.timezone import localtime
 from jinja2.sandbox import SandboxedEnvironment
 from mptt.models import MPTTModel
 
 from dcim.choices import CableLengthUnitChoices, WeightUnitChoices
-from extras.plugins import PluginConfig
 from extras.utils import is_taggable
 from netbox.config import get_config
+from netbox.plugins import PluginConfig
 from urllib.parse import urlencode
 from utilities.constants import HTTP_REQUEST_META_SAFE_COPY
 
@@ -48,6 +49,10 @@ def get_viewname(model, action=None, rest_api=False):
         if is_plugin:
             viewname = f'plugins-api:{app_label}-api:{model_name}'
         else:
+            # Alter the app_label for group and user model_name to point to users app
+            if app_label == 'auth' and model_name in ['group', 'user']:
+                app_label = 'users'
+
             viewname = f'{app_label}-api:{model_name}'
         # Append the action, if any
         if action:
@@ -139,15 +144,23 @@ def count_related(model, field):
     return Coalesce(subquery, 0)
 
 
-def serialize_object(obj, resolve_tags=True, extra=None):
+def serialize_object(obj, resolve_tags=True, extra=None, exclude=None):
     """
     Return a generic JSON representation of an object using Django's built-in serializer. (This is used for things like
     change logging, not the REST API.) Optionally include a dictionary to supplement the object data. A list of keys
     can be provided to exclude them from the returned dictionary. Private fields (prefaced with an underscore) are
     implicitly excluded.
+
+    Args:
+        obj: The object to serialize
+        resolve_tags: If true, any assigned tags will be represented by their names
+        extra: Any additional data to include in the serialized output. Keys provided in this mapping will
+            override object attributes.
+        exclude: An iterable of attributes to exclude from the serialized output
     """
     json_str = serializers.serialize('json', [obj])
     data = json.loads(json_str)[0]['fields']
+    exclude = exclude or []
 
     # Exclude any MPTTModel fields
     if issubclass(obj.__class__, MPTTModel):
@@ -164,15 +177,14 @@ def serialize_object(obj, resolve_tags=True, extra=None):
         tags = getattr(obj, '_tags', None) or obj.tags.all()
         data['tags'] = sorted([tag.name for tag in tags])
 
+    # Skip excluded and private (prefixes with an underscore) attributes
+    for key in list(data.keys()):
+        if key in exclude or (isinstance(key, str) and key.startswith('_')):
+            data.pop(key)
+
     # Append any extra data
     if extra is not None:
         data.update(extra)
-
-    # Copy keys to list to avoid 'dictionary changed size during iteration' exception
-    for key in list(data):
-        # Private fields shouldn't be logged in the object change
-        if isinstance(key, str) and key.startswith('_'):
-            data.pop(key)
 
     return data
 
@@ -225,6 +237,19 @@ def dict_to_filter_params(d, prefix=''):
         else:
             params[k] = val
     return params
+
+
+def dict_to_querydict(d, mutable=True):
+    """
+    Create a QueryDict instance from a regular Python dictionary.
+    """
+    qd = QueryDict(mutable=True)
+    for k, v in d.items():
+        item = MultiValueDict({k: v}) if isinstance(v, (list, tuple, set)) else {k: v}
+        qd.update(item)
+    if not mutable:
+        qd._mutable = False
+    return qd
 
 
 def normalize_querydict(querydict):
@@ -298,7 +323,7 @@ def to_meters(length, unit):
     if unit == CableLengthUnitChoices.UNIT_FOOT:
         return length * Decimal(0.3048)
     if unit == CableLengthUnitChoices.UNIT_INCH:
-        return length * Decimal(0.3048) * 12
+        return length * Decimal(0.0254)
     raise ValueError(f"Unknown unit {unit}. Must be 'km', 'm', 'cm', 'mi', 'ft', or 'in'.")
 
 
@@ -359,18 +384,18 @@ def prepare_cloned_fields(instance):
     return QueryDict(urlencode(params), mutable=True)
 
 
-def shallow_compare_dict(source_dict, destination_dict, exclude=None):
+def shallow_compare_dict(source_dict, destination_dict, exclude=tuple()):
     """
     Return a new dictionary of the different keys. The values of `destination_dict` are returned. Only the equality of
     the first layer of keys/values is checked. `exclude` is a list or tuple of keys to be ignored.
     """
     difference = {}
 
-    for key in destination_dict:
-        if source_dict.get(key) != destination_dict[key]:
-            if isinstance(exclude, (list, tuple)) and key in exclude:
-                continue
-            difference[key] = destination_dict[key]
+    for key, value in destination_dict.items():
+        if key in exclude:
+            continue
+        if source_dict.get(key) != value:
+            difference[key] = value
 
     return difference
 
@@ -487,20 +512,22 @@ def clean_html(html, schemes):
     Also takes a list of allowed URI schemes.
     """
 
-    ALLOWED_TAGS = [
+    ALLOWED_TAGS = {
         "div", "pre", "code", "blockquote", "del",
         "hr", "h1", "h2", "h3", "h4", "h5", "h6",
         "ul", "ol", "li", "p", "br",
         "strong", "em", "a", "b", "i", "img",
         "table", "thead", "tbody", "tr", "th", "td",
         "dl", "dt", "dd",
-    ]
+    }
 
     ALLOWED_ATTRIBUTES = {
         "div": ['class'],
         "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
         "a": ["href", "title"],
         "img": ["src", "title", "alt"],
+        "th": ["align"],
+        "td": ["align"],
     }
 
     return bleach.clean(
@@ -547,3 +574,20 @@ def local_now():
     Return the current date & time in the system timezone.
     """
     return localtime(timezone.now())
+
+
+def get_related_models(model, ordered=True):
+    """
+    Return a list of all models which have a ForeignKey to the given model and the name of the field. For example,
+    `get_related_models(Tenant)` will return all models which have a ForeignKey relationship to Tenant.
+    """
+    related_models = [
+        (field.related_model, field.remote_field.name)
+        for field in model._meta.related_objects
+        if type(field) is ManyToOneRel
+    ]
+
+    if ordered:
+        return sorted(related_models, key=lambda x: x[0]._meta.verbose_name.lower())
+
+    return related_models

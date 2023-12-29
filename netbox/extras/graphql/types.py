@@ -1,11 +1,14 @@
 from extras import filtersets, models
 from extras.graphql.mixins import CustomFieldsMixin, TagsMixin
-from netbox.graphql.types import BaseObjectType, ObjectType
+from netbox.graphql.types import BaseObjectType, ObjectType, OrganizationalObjectType
 
 __all__ = (
     'ConfigContextType',
+    'ConfigTemplateType',
+    'CustomFieldChoiceSetType',
     'CustomFieldType',
     'CustomLinkType',
+    'EventRuleType',
     'ExportTemplateType',
     'ImageAttachmentType',
     'JournalEntryType',
@@ -24,12 +27,28 @@ class ConfigContextType(ObjectType):
         filterset_class = filtersets.ConfigContextFilterSet
 
 
+class ConfigTemplateType(TagsMixin, ObjectType):
+
+    class Meta:
+        model = models.ConfigTemplate
+        fields = '__all__'
+        filterset_class = filtersets.ConfigTemplateFilterSet
+
+
 class CustomFieldType(ObjectType):
 
     class Meta:
         model = models.CustomField
         exclude = ('content_types', )
         filterset_class = filtersets.CustomFieldFilterSet
+
+
+class CustomFieldChoiceSetType(ObjectType):
+
+    class Meta:
+        model = models.CustomFieldChoiceSet
+        fields = '__all__'
+        filterset_class = filtersets.CustomFieldChoiceSetFilterSet
 
 
 class CustomLinkType(ObjectType):
@@ -88,9 +107,16 @@ class TagType(ObjectType):
         filterset_class = filtersets.TagFilterSet
 
 
-class WebhookType(ObjectType):
+class WebhookType(OrganizationalObjectType):
 
     class Meta:
         model = models.Webhook
-        exclude = ('content_types', )
         filterset_class = filtersets.WebhookFilterSet
+
+
+class EventRuleType(OrganizationalObjectType):
+
+    class Meta:
+        model = models.EventRule
+        exclude = ('content_types', )
+        filterset_class = filtersets.EventRuleFilterSet

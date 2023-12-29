@@ -2,10 +2,6 @@ from django.db.models import Q
 
 from .choices import FHRPGroupProtocolChoices, IPAddressRoleChoices
 
-# BGP ASN bounds
-BGP_ASN_MIN = 1
-BGP_ASN_MAX = 2**32 - 1
-
 
 #
 # VRFs
@@ -90,9 +86,3 @@ VLANGROUP_SCOPE_TYPES = (
 # 16-bit port number
 SERVICE_PORT_MIN = 1
 SERVICE_PORT_MAX = 65535
-
-L2VPN_ASSIGNMENT_MODELS = Q(
-    Q(app_label='dcim', model='interface') |
-    Q(app_label='ipam', model='vlan') |
-    Q(app_label='virtualization', model='vminterface')
-)

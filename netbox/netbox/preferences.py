@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.utils.translation import gettext as _
+
 from netbox.registry import registry
 from users.preferences import UserPreference
 from utilities.paginator import EnhancedPaginator
@@ -16,23 +18,30 @@ PREFERENCES = {
     'ui.colormode': UserPreference(
         label=_('Color mode'),
         choices=(
-            ('light', 'Light'),
-            ('dark', 'Dark'),
+            ('light', _('Light')),
+            ('dark', _('Dark')),
         ),
         default='light',
+    ),
+    'locale.language': UserPreference(
+        label=_('Language'),
+        choices=(
+            ('', _('Auto')),
+            *settings.LANGUAGES,
+        )
     ),
     'pagination.per_page': UserPreference(
         label=_('Page length'),
         choices=get_page_lengths(),
-        description=_('The number of objects to display per page'),
+        description=_('The default number of objects to display per page'),
         coerce=lambda x: int(x)
     ),
     'pagination.placement': UserPreference(
         label=_('Paginator placement'),
         choices=(
-            ('bottom', 'Bottom'),
-            ('top', 'Top'),
-            ('both', 'Both'),
+            ('bottom', _('Bottom')),
+            ('top', _('Top')),
+            ('both', _('Both')),
         ),
         description=_('Where the paginator controls will be displayed relative to a table'),
         default='bottom'

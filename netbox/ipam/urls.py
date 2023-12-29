@@ -6,6 +6,14 @@ from . import views
 app_name = 'ipam'
 urlpatterns = [
 
+    # ASN ranges
+    path('asn-ranges/', views.ASNRangeListView.as_view(), name='asnrange_list'),
+    path('asn-ranges/add/', views.ASNRangeEditView.as_view(), name='asnrange_add'),
+    path('asn-ranges/import/', views.ASNRangeBulkImportView.as_view(), name='asnrange_import'),
+    path('asn-ranges/edit/', views.ASNRangeBulkEditView.as_view(), name='asnrange_bulk_edit'),
+    path('asn-ranges/delete/', views.ASNRangeBulkDeleteView.as_view(), name='asnrange_bulk_delete'),
+    path('asn-ranges/<int:pk>/', include(get_model_urls('ipam', 'asnrange'))),
+
     # ASNs
     path('asns/', views.ASNListView.as_view(), name='asn_list'),
     path('asns/add/', views.ASNEditView.as_view(), name='asn_add'),
@@ -123,20 +131,4 @@ urlpatterns = [
     path('services/edit/', views.ServiceBulkEditView.as_view(), name='service_bulk_edit'),
     path('services/delete/', views.ServiceBulkDeleteView.as_view(), name='service_bulk_delete'),
     path('services/<int:pk>/', include(get_model_urls('ipam', 'service'))),
-
-    # L2VPN
-    path('l2vpns/', views.L2VPNListView.as_view(), name='l2vpn_list'),
-    path('l2vpns/add/', views.L2VPNEditView.as_view(), name='l2vpn_add'),
-    path('l2vpns/import/', views.L2VPNBulkImportView.as_view(), name='l2vpn_import'),
-    path('l2vpns/edit/', views.L2VPNBulkEditView.as_view(), name='l2vpn_bulk_edit'),
-    path('l2vpns/delete/', views.L2VPNBulkDeleteView.as_view(), name='l2vpn_bulk_delete'),
-    path('l2vpns/<int:pk>/', include(get_model_urls('ipam', 'l2vpn'))),
-
-    # L2VPN terminations
-    path('l2vpn-terminations/', views.L2VPNTerminationListView.as_view(), name='l2vpntermination_list'),
-    path('l2vpn-terminations/add/', views.L2VPNTerminationEditView.as_view(), name='l2vpntermination_add'),
-    path('l2vpn-terminations/import/', views.L2VPNTerminationBulkImportView.as_view(), name='l2vpntermination_import'),
-    path('l2vpn-terminations/edit/', views.L2VPNTerminationBulkEditView.as_view(), name='l2vpntermination_bulk_edit'),
-    path('l2vpn-terminations/delete/', views.L2VPNTerminationBulkDeleteView.as_view(), name='l2vpntermination_bulk_delete'),
-    path('l2vpn-terminations/<int:pk>/', include(get_model_urls('ipam', 'l2vpntermination'))),
 ]

@@ -3,6 +3,7 @@ from rest_framework.exceptions import APIException
 
 __all__ = (
     'AbortRequest',
+    'AbortScript',
     'AbortTransaction',
     'PermissionsViolation',
     'RQWorkerNotRunningException',
@@ -22,6 +23,13 @@ class AbortRequest(Exception):
     """
     def __init__(self, message):
         self.message = message
+
+
+class AbortScript(Exception):
+    """
+    Raised to cleanly abort a script.
+    """
+    pass
 
 
 class PermissionsViolation(Exception):

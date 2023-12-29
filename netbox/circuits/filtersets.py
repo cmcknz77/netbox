@@ -16,6 +16,7 @@ __all__ = (
     'CircuitTerminationFilterSet',
     'CircuitTypeFilterSet',
     'ProviderNetworkFilterSet',
+    'ProviderAccountFilterSet',
     'ProviderFilterSet',
 )
 
@@ -66,16 +67,45 @@ class ProviderFilterSet(NetBoxModelFilterSet, ContactModelFilterSet):
 
     class Meta:
         model = Provider
-        fields = ['id', 'name', 'slug', 'account']
+        fields = ['id', 'name', 'slug', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(account__icontains=value) |
+            Q(description__icontains=value) |
+            Q(accounts__account__icontains=value) |
+            Q(accounts__name__icontains=value) |
             Q(comments__icontains=value)
         )
+
+
+class ProviderAccountFilterSet(NetBoxModelFilterSet):
+    provider_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=Provider.objects.all(),
+        label=_('Provider (ID)'),
+    )
+    provider = django_filters.ModelMultipleChoiceFilter(
+        field_name='provider__slug',
+        queryset=Provider.objects.all(),
+        to_field_name='slug',
+        label=_('Provider (slug)'),
+    )
+
+    class Meta:
+        model = ProviderAccount
+        fields = ['id', 'name', 'account', 'description']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(account__icontains=value) |
+            Q(comments__icontains=value)
+        ).distinct()
 
 
 class ProviderNetworkFilterSet(NetBoxModelFilterSet):
@@ -109,7 +139,7 @@ class CircuitTypeFilterSet(OrganizationalModelFilterSet):
 
     class Meta:
         model = CircuitType
-        fields = ['id', 'name', 'slug', 'description']
+        fields = ['id', 'name', 'slug', 'color', 'description']
 
 
 class CircuitFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilterSet):
@@ -123,10 +153,15 @@ class CircuitFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilte
         to_field_name='slug',
         label=_('Provider (slug)'),
     )
+    provider_account_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='provider_account',
+        queryset=ProviderAccount.objects.all(),
+        label=_('Provider account (ID)'),
+    )
     provider_network_id = django_filters.ModelMultipleChoiceFilter(
         field_name='terminations__provider_network',
         queryset=ProviderNetwork.objects.all(),
-        label=_('ProviderNetwork (ID)'),
+        label=_('Provider network (ID)'),
     )
     type_id = django_filters.ModelMultipleChoiceFilter(
         queryset=CircuitType.objects.all(),

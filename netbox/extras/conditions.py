@@ -44,7 +44,8 @@ class Condition:
         bool: (EQ, CONTAINS),
         int: (EQ, GT, GTE, LT, LTE, CONTAINS),
         float: (EQ, GT, GTE, LT, LTE, CONTAINS),
-        list: (EQ, IN, CONTAINS)
+        list: (EQ, IN, CONTAINS),
+        type(None): (EQ,)
     }
 
     def __init__(self, attr, value, op=EQ, negate=False):
@@ -64,8 +65,14 @@ class Condition:
         """
         Evaluate the provided data to determine whether it matches the condition.
         """
+        def _get(obj, key):
+            if isinstance(obj, list):
+                return [dict.get(i, key) for i in obj]
+
+            return dict.get(obj, key)
+
         try:
-            value = functools.reduce(dict.get, self.attr.split('.'), data)
+            value = functools.reduce(_get, self.attr.split('.'), data)
         except TypeError:
             # Invalid key path
             value = None

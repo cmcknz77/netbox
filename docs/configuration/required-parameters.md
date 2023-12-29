@@ -25,7 +25,7 @@ ALLOWED_HOSTS = ['*']
 
 ## DATABASE
 
-NetBox requires access to a PostgreSQL 11 or later database service to store data. This service can run locally on the NetBox server or on a remote system. The following parameters must be defined within the `DATABASE` dictionary:
+NetBox requires access to a PostgreSQL 12 or later database service to store data. This service can run locally on the NetBox server or on a remote system. The following parameters must be defined within the `DATABASE` dictionary:
 
 * `NAME` - Database name
 * `USER` - PostgreSQL username
@@ -33,11 +33,13 @@ NetBox requires access to a PostgreSQL 11 or later database service to store dat
 * `HOST` - Name or IP address of the database server (use `localhost` if running locally)
 * `PORT` - TCP port of the PostgreSQL service; leave blank for default port (TCP/5432)
 * `CONN_MAX_AGE` - Lifetime of a [persistent database connection](https://docs.djangoproject.com/en/stable/ref/databases/#persistent-connections), in seconds (300 is the default)
+* `ENGINE` - The database backend to use; must be a PostgreSQL-compatible backend (e.g. `django.db.backends.postgresql`)
 
 Example:
 
 ```python
 DATABASE = {
+    'ENGINE': 'django.db.backends.postgresql',
     'NAME': 'netbox',               # Database name
     'USER': 'netbox',               # PostgreSQL username
     'PASSWORD': 'J5brHrAXFLQSif0K', # PostgreSQL password
@@ -50,14 +52,14 @@ DATABASE = {
 !!! note
     NetBox supports all PostgreSQL database options supported by the underlying Django framework. For a complete list of available parameters, please see [the Django documentation](https://docs.djangoproject.com/en/stable/ref/settings/#databases).
 
+!!! warning
+    Make sure to use a PostgreSQL-compatible backend for the ENGINE setting. If you don't specify an ENGINE, the default will be django.db.backends.postgresql.
+
 ---
 
 ## REDIS
 
-[Redis](https://redis.io/) is an in-memory data store similar to memcached. While Redis has been an optional component of
-NetBox since the introduction of webhooks in version 2.4, it is required starting in 2.6 to support NetBox's caching
-functionality (as well as other planned features). In 2.7, the connection settings were broken down into two sections for
-task queuing and caching, allowing the user to connect to different Redis instances/databases per feature.
+[Redis](https://redis.io/) is a lightweight in-memory data store similar to memcached. NetBox employs Redis for background task queuing and other features.
 
 Redis is configured using a configuration setting similar to `DATABASE` and these settings are the same for both of the `tasks` and `caching` subsections:
 
@@ -76,7 +78,7 @@ REDIS = {
     'tasks': {
         'HOST': 'redis.example.com',
         'PORT': 1234,
-        'USERNAME': 'netbox'
+        'USERNAME': 'netbox',
         'PASSWORD': 'foobar',
         'DATABASE': 0,
         'SSL': False,
@@ -84,7 +86,7 @@ REDIS = {
     'caching': {
         'HOST': 'localhost',
         'PORT': 6379,
-        'USERNAME': ''
+        'USERNAME': '',
         'PASSWORD': '',
         'DATABASE': 1,
         'SSL': False,
@@ -144,8 +146,6 @@ REDIS = {
 
 ## SECRET_KEY
 
-This is a secret, random string used to assist in the creation new cryptographic hashes for passwords and HTTP cookies. The key defined here should not be shared outside of the configuration file. `SECRET_KEY` can be changed at any time, however be aware that doing so will invalidate all existing sessions.
+This is a secret, pseudorandom string used to assist in the creation new cryptographic hashes for passwords and HTTP cookies. The key defined here should not be shared outside the configuration file. `SECRET_KEY` can be changed at any time without impacting stored data, however be aware that doing so will invalidate all existing user sessions. NetBox deployments comprising multiple nodes must have the same secret key configured on all nodes.
 
-Please note that this key is **not** used directly for hashing user passwords or for the encrypted storage of secret data in NetBox.
-
-`SECRET_KEY` should be at least 50 characters in length and contain a random mix of letters, digits, and symbols. The script located at `$INSTALL_ROOT/netbox/generate_secret_key.py` may be used to generate a suitable key.
+`SECRET_KEY` **must** be at least 50 characters in length, and should contain a mix of letters, digits, and symbols. The script located at `$INSTALL_ROOT/netbox/generate_secret_key.py` may be used to generate a suitable key. Please note that this key is **not** used directly for hashing user passwords or for the encrypted storage of secret data in NetBox.

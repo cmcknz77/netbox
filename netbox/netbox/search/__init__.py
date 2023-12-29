@@ -2,6 +2,7 @@ from collections import namedtuple
 
 from django.db import models
 
+from ipam.fields import IPAddressField, IPNetworkField
 from netbox.registry import registry
 
 ObjectFieldValue = namedtuple('ObjectFieldValue', ('name', 'type', 'weight', 'value'))
@@ -11,6 +12,8 @@ class FieldTypes:
     FLOAT = 'float'
     INTEGER = 'int'
     STRING = 'str'
+    INET = 'inet'
+    CIDR = 'cidr'
 
 
 class LookupTypes:
@@ -30,10 +33,12 @@ class SearchIndex:
         category: The label of the group under which this indexer is categorized (for form field display). If none,
             the name of the model's app will be used.
         fields: An iterable of two-tuples defining the model fields to be indexed and the weight associated with each.
+        display_attrs: An iterable of additional object attributes to include when displaying search results.
     """
     model = None
     category = None
     fields = ()
+    display_attrs = ()
 
     @staticmethod
     def get_field_type(instance, field_name):
@@ -43,6 +48,10 @@ class SearchIndex:
         field_cls = instance._meta.get_field(field_name).__class__
         if issubclass(field_cls, (models.FloatField, models.DecimalField)):
             return FieldTypes.FLOAT
+        if issubclass(field_cls, IPAddressField):
+            return FieldTypes.INET
+        if issubclass(field_cls, IPNetworkField):
+            return FieldTypes.CIDR
         if issubclass(field_cls, models.IntegerField):
             return FieldTypes.INTEGER
         return FieldTypes.STRING

@@ -167,6 +167,12 @@ table td > .progress {
   }
 }
 
+.alert {
+  code {
+    color: $gray-600;
+  }
+}
+
 span.profile-button .dropdown-menu {
   right: 0;
   left: auto;
@@ -231,17 +237,21 @@ table {
 
     p {
       // Remove spacing from paragraph elements within tables.
+      margin-bottom: 0.5em;
+    }
+
+    p:last-child {
       margin-bottom: 0;
     }
   }
 
   th.asc > a::after {
-    content: "\f0140";
+    content: '\f0140';
     font-family: 'Material Design Icons';
   }
 
   th.desc > a::after {
-    content: "\f0143";
+    content: '\f0143';
     font-family: 'Material Design Icons';
   }
 
@@ -416,18 +426,18 @@ nav.search {
   }
 }
 
-// Styles for the quicksearch and its clear button; 
+// Styles for the quicksearch and its clear button;
 // Overrides input-group styles and adds transition effects
 .quicksearch {
-  input[type="search"] {
-    border-radius: $border-radius  !important;
+  input[type='search'] {
+    border-radius: $border-radius !important;
   }
 
   button {
     margin-left: -32px !important;
     z-index: 100 !important;
     outline: none !important;
-    border-radius: $border-radius  !important;
+    border-radius: $border-radius !important;
     transition: visibility 0s, opacity 0.2s linear;
   }
 
@@ -998,9 +1008,36 @@ div.card-overlay {
   padding: 8px;
 }
 
+th[align="left"] {
+  text-align: left;
+}
+
+th[align="center"] {
+  text-align: center;
+}
+
+th[align="right"] {
+  text-align: right;
+}
+
+/* Markdown widget */
+.markdown-widget {
+  .nav-link {
+    border-bottom: 0;
+
+    &.active {
+      background-color: var(--nbx-body-bg);
+    }
+  }
+
+  .nav-tabs {
+    background-color: var(--nbx-pre-bg);
+  }
+}
+
 // Preformatted text blocks
 td pre {
-  margin-bottom: 0
+  margin-bottom: 0;
 }
 pre.block {
   padding: $spacer;

@@ -16,6 +16,7 @@ Custom fields may be created by navigating to Customization > Custom Fields. Net
 * Decimal: A fixed-precision decimal number (4 decimal places)
 * Boolean: True or false
 * Date: A date in ISO 8601 format (YYYY-MM-DD)
+* Date & time: A date and time in ISO 8601 format (YYYY-MM-DD HH:MM:SS)
 * URL: This will be presented as a link in the web UI
 * JSON: Arbitrary data stored in JSON format
 * Selection: A selection of one of several pre-defined custom choices
@@ -35,23 +36,25 @@ The filter logic controls how values are matched when filtering objects by the c
 
 ### Grouping
 
-!!! note
-    This feature was introduced in NetBox v3.3.
-
 Related custom fields can be grouped together within the UI by assigning each the same group name. When at least one custom field for an object type has a group defined, it will appear under the group heading within the custom fields panel under the object view. All custom fields with the same group name will appear under that heading. (Note that the group names must match exactly, or each will appear as a separate heading.)
 
 This parameter has no effect on the API representation of custom field data.
 
-### Visibility
+### Visibility & Editing
 
-!!! note
-    This feature was introduced in NetBox v3.3.
+!!! info "This feature was improved in NetBox v3.7."
 
-When creating a custom field, there are three options for UI visibility. These control how and whether the custom field is displayed within the NetBox UI.
+When creating a custom field, users can control the conditions under which it may be displayed and edited within the NetBox user interface. The following choices are available for controlling the display of a custom field on an object:
 
-* **Read/write** (default): The custom field is included when viewing and editing objects.
-* **Read-only**: The custom field is displayed when viewing an object, but it cannot be edited via the UI. (It will appear in the form as a read-only field.)
+* **Always** (default): The custom field is included when viewing an object.
+* **If Set**: The custom field is included only if a value has been defined for the object.
 * **Hidden**: The custom field will never be displayed within the UI. This option is recommended for fields which are not intended for use by human users.
+
+Additionally, the following options are available for controlling whether custom field values can be altered within the NetBox UI:
+
+* **Yes** (default): The custom field's value may be modified when editing an object.
+* **No**: The custom field is displayed for reference when editing an object, but its value may not be modified.
+* **Hidden**: The custom field is not displayed when editing an object.
 
 Note that this setting has no impact on the REST or GraphQL APIs: Custom field data will always be available via either API.
 
@@ -65,7 +68,7 @@ NetBox supports limited custom validation for custom field values. Following are
 
 ### Custom Selection Fields
 
-Each custom selection field must have at least two choices. These are specified as a comma-separated list. Choices appear in forms in the order they are listed. Note that choice values are saved exactly as they appear, so it's best to avoid superfluous punctuation or symbols where possible.
+Each custom selection field must designate a [choice set](../models/extras/customfieldchoiceset.md) containing at least two choices. These are specified as a comma-separated list.
 
 If a default value is specified for a selection field, it must exactly match one of the provided choices. The value of a multiple selection field will always return a list, even if only one value is selected.
 

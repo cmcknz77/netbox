@@ -1,26 +1,30 @@
 import django_filters
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
+from core.models import DataSource
 from dcim.models import DeviceRole, DeviceType, Location, Platform, Region, Site, SiteGroup
 from netbox.filtersets import BaseFilterSet, ChangeLoggedModelFilterSet, NetBoxModelFilterSet
 from tenancy.models import Tenant, TenantGroup
 from utilities.filters import ContentTypeFilter, MultiValueCharFilter, MultiValueNumberFilter
 from virtualization.models import Cluster, ClusterGroup, ClusterType
 from .choices import *
+from .filters import TagFilter
 from .models import *
 
-
 __all__ = (
+    'BookmarkFilterSet',
     'ConfigContextFilterSet',
+    'ConfigTemplateFilterSet',
     'ContentTypeFilterSet',
+    'CustomFieldChoiceSetFilterSet',
     'CustomFieldFilterSet',
     'CustomLinkFilterSet',
+    'EventRuleFilterSet',
     'ExportTemplateFilterSet',
     'ImageAttachmentFilterSet',
-    'JobResultFilterSet',
     'JournalEntryFilterSet',
     'LocalConfigContextFilterSet',
     'ObjectChangeFilterSet',
@@ -30,7 +34,36 @@ __all__ = (
 )
 
 
-class WebhookFilterSet(BaseFilterSet):
+class WebhookFilterSet(NetBoxModelFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    http_method = django_filters.MultipleChoiceFilter(
+        choices=WebhookHttpMethodChoices
+    )
+    payload_url = MultiValueCharFilter(
+        lookup_expr='icontains'
+    )
+
+    class Meta:
+        model = Webhook
+        fields = [
+            'id', 'name', 'payload_url', 'http_method', 'http_content_type', 'secret', 'ssl_verification',
+            'ca_file_path', 'description',
+        ]
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(payload_url__icontains=value)
+        )
+
+
+class EventRuleFilterSet(NetBoxModelFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label=_('Search'),
@@ -39,15 +72,17 @@ class WebhookFilterSet(BaseFilterSet):
         field_name='content_types__id'
     )
     content_types = ContentTypeFilter()
-    http_method = django_filters.MultipleChoiceFilter(
-        choices=WebhookHttpMethodChoices
+    action_type = django_filters.MultipleChoiceFilter(
+        choices=EventRuleActionChoices
     )
+    action_object_type = ContentTypeFilter()
+    action_object_id = MultiValueNumberFilter()
 
     class Meta:
-        model = Webhook
+        model = EventRule
         fields = [
-            'id', 'name', 'type_create', 'type_update', 'type_delete', 'payload_url', 'enabled', 'http_method',
-            'http_content_type', 'secret', 'ssl_verification', 'ca_file_path',
+            'id', 'name', 'type_create', 'type_update', 'type_delete', 'type_job_start', 'type_job_end', 'enabled',
+            'action_type', 'description',
         ]
 
     def search(self, queryset, name, value):
@@ -55,7 +90,8 @@ class WebhookFilterSet(BaseFilterSet):
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(payload_url__icontains=value)
+            Q(description__icontains=value) |
+            Q(comments__icontains=value)
         )
 
 
@@ -71,12 +107,20 @@ class CustomFieldFilterSet(BaseFilterSet):
         field_name='content_types__id'
     )
     content_types = ContentTypeFilter()
+    choice_set_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=CustomFieldChoiceSet.objects.all()
+    )
+    choice_set = django_filters.ModelMultipleChoiceFilter(
+        field_name='choice_set__name',
+        queryset=CustomFieldChoiceSet.objects.all(),
+        to_field_name='name'
+    )
 
     class Meta:
         model = CustomField
         fields = [
-            'id', 'content_types', 'name', 'group_name', 'required', 'search_weight', 'filter_logic', 'ui_visibility',
-            'weight', 'description',
+            'id', 'content_types', 'name', 'group_name', 'required', 'search_weight', 'filter_logic', 'ui_visible',
+            'ui_editable', 'weight', 'is_cloneable', 'description',
         ]
 
     def search(self, queryset, name, value):
@@ -88,6 +132,34 @@ class CustomFieldFilterSet(BaseFilterSet):
             Q(group_name__icontains=value) |
             Q(description__icontains=value)
         )
+
+
+class CustomFieldChoiceSetFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    choice = MultiValueCharFilter(
+        method='filter_by_choice'
+    )
+
+    class Meta:
+        model = CustomFieldChoiceSet
+        fields = [
+            'id', 'name', 'description', 'base_choices', 'order_alphabetically',
+        ]
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        )
+
+    def filter_by_choice(self, queryset, name, value):
+        # TODO: Support case-insensitive matching
+        return queryset.filter(extra_choices__overlap=value)
 
 
 class CustomLinkFilterSet(BaseFilterSet):
@@ -126,10 +198,18 @@ class ExportTemplateFilterSet(BaseFilterSet):
         field_name='content_types__id'
     )
     content_types = ContentTypeFilter()
+    data_source_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data source (ID)'),
+    )
+    data_file_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data file (ID)'),
+    )
 
     class Meta:
         model = ExportTemplate
-        fields = ['id', 'content_types', 'name', 'description']
+        fields = ['id', 'content_types', 'name', 'description', 'data_synced']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -150,12 +230,12 @@ class SavedFilterFilterSet(BaseFilterSet):
     )
     content_types = ContentTypeFilter()
     user_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         label=_('User (ID)'),
     )
     user = django_filters.ModelMultipleChoiceFilter(
         field_name='user__username',
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         to_field_name='username',
         label=_('User (name)'),
     )
@@ -189,6 +269,26 @@ class SavedFilterFilterSet(BaseFilterSet):
         return queryset.filter(Q(enabled=False) | Q(Q(shared=False) & ~Q(user=user)))
 
 
+class BookmarkFilterSet(BaseFilterSet):
+    created = django_filters.DateTimeFilter()
+    object_type_id = MultiValueNumberFilter()
+    object_type = ContentTypeFilter()
+    user_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=get_user_model().objects.all(),
+        label=_('User (ID)'),
+    )
+    user = django_filters.ModelMultipleChoiceFilter(
+        field_name='user__username',
+        queryset=get_user_model().objects.all(),
+        to_field_name='username',
+        label=_('User (name)'),
+    )
+
+    class Meta:
+        model = Bookmark
+        fields = ['id', 'object_id']
+
+
 class ImageAttachmentFilterSet(BaseFilterSet):
     q = django_filters.CharFilter(
         method='search',
@@ -210,13 +310,16 @@ class ImageAttachmentFilterSet(BaseFilterSet):
 class JournalEntryFilterSet(NetBoxModelFilterSet):
     created = django_filters.DateTimeFromToRangeFilter()
     assigned_object_type = ContentTypeFilter()
+    assigned_object_type_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ContentType.objects.all()
+    )
     created_by_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         label=_('User (ID)'),
     )
     created_by = django_filters.ModelMultipleChoiceFilter(
         field_name='created_by__username',
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         to_field_name='username',
         label=_('User (name)'),
     )
@@ -245,10 +348,13 @@ class TagFilterSet(ChangeLoggedModelFilterSet):
     content_type_id = MultiValueNumberFilter(
         method='_content_type_id'
     )
+    for_object_type_id = MultiValueNumberFilter(
+        method='_for_object_type'
+    )
 
     class Meta:
         model = Tag
-        fields = ['id', 'name', 'slug', 'color', 'description']
+        fields = ['id', 'name', 'slug', 'color', 'description', 'object_types']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -284,6 +390,11 @@ class TagFilterSet(ChangeLoggedModelFilterSet):
         content_types = ContentType.objects.filter(pk__in=values)
 
         return queryset.filter(extras_taggeditem_items__content_type__in=content_types).distinct()
+
+    def _for_object_type(self, queryset, name, values):
+        return queryset.filter(
+            Q(object_types__id__in=values) | Q(object_types__isnull=True)
+        )
 
 
 class ConfigContextFilterSet(ChangeLoggedModelFilterSet):
@@ -422,10 +533,18 @@ class ConfigContextFilterSet(ChangeLoggedModelFilterSet):
         to_field_name='slug',
         label=_('Tag (slug)'),
     )
+    data_source_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data source (ID)'),
+    )
+    data_file_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data file (ID)'),
+    )
 
     class Meta:
         model = ConfigContext
-        fields = ['id', 'name', 'is_active']
+        fields = ['id', 'name', 'is_active', 'data_synced', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -434,6 +553,34 @@ class ConfigContextFilterSet(ChangeLoggedModelFilterSet):
             Q(name__icontains=value) |
             Q(description__icontains=value) |
             Q(data__icontains=value)
+        )
+
+
+class ConfigTemplateFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    data_source_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data source (ID)'),
+    )
+    data_file_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data file (ID)'),
+    )
+    tag = TagFilter()
+
+    class Meta:
+        model = ConfigTemplate
+        fields = ['id', 'name', 'description', 'data_synced']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
         )
 
 
@@ -458,13 +605,16 @@ class ObjectChangeFilterSet(BaseFilterSet):
     )
     time = django_filters.DateTimeFromToRangeFilter()
     changed_object_type = ContentTypeFilter()
+    changed_object_type_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ContentType.objects.all()
+    )
     user_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         label=_('User (ID)'),
     )
     user = django_filters.ModelMultipleChoiceFilter(
         field_name='user__username',
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         to_field_name='username',
         label=_('User name'),
     )
@@ -482,69 +632,6 @@ class ObjectChangeFilterSet(BaseFilterSet):
         return queryset.filter(
             Q(user_name__icontains=value) |
             Q(object_repr__icontains=value)
-        )
-
-
-#
-# Job Results
-#
-
-class JobResultFilterSet(BaseFilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-    )
-    created = django_filters.DateTimeFilter()
-    created__before = django_filters.DateTimeFilter(
-        field_name='created',
-        lookup_expr='lte'
-    )
-    created__after = django_filters.DateTimeFilter(
-        field_name='created',
-        lookup_expr='gte'
-    )
-    scheduled = django_filters.DateTimeFilter()
-    scheduled__before = django_filters.DateTimeFilter(
-        field_name='scheduled',
-        lookup_expr='lte'
-    )
-    scheduled__after = django_filters.DateTimeFilter(
-        field_name='scheduled',
-        lookup_expr='gte'
-    )
-    started = django_filters.DateTimeFilter()
-    started__before = django_filters.DateTimeFilter(
-        field_name='started',
-        lookup_expr='lte'
-    )
-    started__after = django_filters.DateTimeFilter(
-        field_name='started',
-        lookup_expr='gte'
-    )
-    completed = django_filters.DateTimeFilter()
-    completed__before = django_filters.DateTimeFilter(
-        field_name='completed',
-        lookup_expr='lte'
-    )
-    completed__after = django_filters.DateTimeFilter(
-        field_name='completed',
-        lookup_expr='gte'
-    )
-    status = django_filters.MultipleChoiceFilter(
-        choices=JobResultStatusChoices,
-        null_value=None
-    )
-
-    class Meta:
-        model = JobResult
-        fields = ('id', 'interval', 'status', 'user', 'obj_type', 'name')
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(user__username__icontains=value) |
-            Q(name__icontains=value)
         )
 
 

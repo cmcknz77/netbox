@@ -17,6 +17,7 @@ class MyModelIndex(SearchIndex):
         ('description', 500),
         ('comments', 5000),
     )
+    display_attrs = ('site', 'device', 'status', 'description')
 ```
 
 A SearchIndex subclass defines both its model and a list of two-tuples specifying which model fields to be indexed and the weight (precedence) associated with each. Guidance on weight assignment for fields is provided below.
@@ -29,7 +30,7 @@ A SearchIndex subclass defines both its model and a list of two-tuples specifyin
 | 60     | Unique serialized attribute (per related object) | Device.serial                                      |
 | 100    | Primary human identifier                         | Device.name, Circuit.cid, Cable.label              |
 | 110    | Slug                                             | Site.slug                                          |
-| 200    | Secondary identifier                             | Provider.account, DeviceType.part_number           |
+| 200    | Secondary identifier                             | ProviderAccount.account, DeviceType.part_number    |
 | 300    | Highly unique descriptive attribute              | CircuitTermination.xconnect_id, IPAddress.dns_name |
 | 500    | Description                                      | Site.description                                   |
 | 1000   | Custom field default                             | -                                                  |

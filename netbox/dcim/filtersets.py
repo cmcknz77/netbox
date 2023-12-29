@@ -1,9 +1,13 @@
 import django_filters
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext as _
 
+from circuits.models import CircuitTermination
 from extras.filtersets import LocalConfigContextFilterSet
-from ipam.models import ASN, L2VPN, IPAddress, VRF
+from extras.models import ConfigTemplate
+from ipam.filtersets import PrimaryIPFilterSet
+from ipam.models import ASN, IPAddress, VRF
 from netbox.filtersets import (
     BaseFilterSet, ChangeLoggedModelFilterSet, OrganizationalModelFilterSet, NetBoxModelFilterSet,
 )
@@ -15,6 +19,7 @@ from utilities.filters import (
     TreeNodeMultipleChoiceFilter,
 )
 from virtualization.models import Cluster
+from vpn.models import L2VPN
 from wireless.choices import WirelessRoleChoices, WirelessChannelChoices
 from .choices import *
 from .constants import *
@@ -24,6 +29,7 @@ __all__ = (
     'CableFilterSet',
     'CabledObjectFilterSet',
     'CableTerminationFilterSet',
+    'CommonInterfaceFilterSet',
     'ConsoleConnectionFilterSet',
     'ConsolePortFilterSet',
     'ConsolePortTemplateFilterSet',
@@ -321,8 +327,8 @@ class RackFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilterSe
     class Meta:
         model = Rack
         fields = [
-            'id', 'name', 'facility_id', 'asset_tag', 'u_height', 'desc_units', 'outer_width', 'outer_depth',
-            'outer_unit', 'mounting_depth', 'weight', 'max_weight', 'weight_unit'
+            'id', 'name', 'facility_id', 'asset_tag', 'u_height', 'starting_unit', 'desc_units', 'outer_width',
+            'outer_depth', 'outer_unit', 'mounting_depth', 'weight', 'max_weight', 'weight_unit', 'description',
         ]
 
     def search(self, queryset, name, value):
@@ -333,6 +339,7 @@ class RackFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilterSe
             Q(facility_id__icontains=value) |
             Q(serial__icontains=value.strip()) |
             Q(asset_tag__icontains=value.strip()) |
+            Q(description__icontains=value) |
             Q(comments__icontains=value)
         )
 
@@ -393,12 +400,12 @@ class RackReservationFilterSet(NetBoxModelFilterSet, TenancyFilterSet):
         label=_('Location (slug)'),
     )
     user_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         label=_('User (ID)'),
     )
     user = django_filters.ModelMultipleChoiceFilter(
         field_name='user__username',
-        queryset=User.objects.all(),
+        queryset=get_user_model().objects.all(),
         to_field_name='username',
         label=_('User (name)'),
     )
@@ -435,6 +442,16 @@ class DeviceTypeFilterSet(NetBoxModelFilterSet):
         queryset=Manufacturer.objects.all(),
         to_field_name='slug',
         label=_('Manufacturer (slug)'),
+    )
+    default_platform_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=Platform.objects.all(),
+        label=_('Default platform (ID)'),
+    )
+    default_platform = django_filters.ModelMultipleChoiceFilter(
+        field_name='default_platform__slug',
+        queryset=Platform.objects.all(),
+        to_field_name='slug',
+        label=_('Default platform (slug)'),
     )
     has_front_image = django_filters.BooleanFilter(
         label=_('Has a front image'),
@@ -484,7 +501,8 @@ class DeviceTypeFilterSet(NetBoxModelFilterSet):
     class Meta:
         model = DeviceType
         fields = [
-            'id', 'model', 'slug', 'part_number', 'u_height', 'is_full_depth', 'subdevice_role', 'airflow', 'weight', 'weight_unit',
+            'id', 'model', 'slug', 'part_number', 'u_height', 'exclude_from_utilization', 'is_full_depth',
+            'subdevice_role', 'airflow', 'weight', 'weight_unit', 'description',
         ]
 
     def search(self, queryset, name, value):
@@ -494,6 +512,7 @@ class DeviceTypeFilterSet(NetBoxModelFilterSet):
             Q(manufacturer__name__icontains=value) |
             Q(model__icontains=value) |
             Q(part_number__icontains=value) |
+            Q(description__icontains=value) |
             Q(comments__icontains=value)
         )
 
@@ -578,7 +597,7 @@ class ModuleTypeFilterSet(NetBoxModelFilterSet):
 
     class Meta:
         model = ModuleType
-        fields = ['id', 'model', 'part_number', 'weight', 'weight_unit']
+        fields = ['id', 'model', 'part_number', 'weight', 'weight_unit', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -587,6 +606,7 @@ class ModuleTypeFilterSet(NetBoxModelFilterSet):
             Q(manufacturer__name__icontains=value) |
             Q(model__icontains=value) |
             Q(part_number__icontains=value) |
+            Q(description__icontains=value) |
             Q(comments__icontains=value)
         )
 
@@ -626,7 +646,10 @@ class DeviceTypeComponentFilterSet(django_filters.FilterSet):
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(name__icontains=value)
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        )
 
 
 class ModularDeviceTypeComponentFilterSet(DeviceTypeComponentFilterSet):
@@ -641,21 +664,21 @@ class ConsolePortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceType
 
     class Meta:
         model = ConsolePortTemplate
-        fields = ['id', 'name', 'type']
+        fields = ['id', 'name', 'type', 'description']
 
 
 class ConsoleServerPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
 
     class Meta:
         model = ConsoleServerPortTemplate
-        fields = ['id', 'name', 'type']
+        fields = ['id', 'name', 'type', 'description']
 
 
 class PowerPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
 
     class Meta:
         model = PowerPortTemplate
-        fields = ['id', 'name', 'type', 'maximum_draw', 'allocated_draw']
+        fields = ['id', 'name', 'type', 'maximum_draw', 'allocated_draw', 'description']
 
 
 class PowerOutletTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
@@ -666,7 +689,7 @@ class PowerOutletTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceType
 
     class Meta:
         model = PowerOutletTemplate
-        fields = ['id', 'name', 'type', 'feed_leg']
+        fields = ['id', 'name', 'type', 'feed_leg', 'description']
 
 
 class InterfaceTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
@@ -674,16 +697,23 @@ class InterfaceTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeCo
         choices=InterfaceTypeChoices,
         null_value=None
     )
+    bridge_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='bridge',
+        queryset=InterfaceTemplate.objects.all()
+    )
     poe_mode = django_filters.MultipleChoiceFilter(
         choices=InterfacePoEModeChoices
     )
     poe_type = django_filters.MultipleChoiceFilter(
         choices=InterfacePoETypeChoices
     )
+    rf_role = django_filters.MultipleChoiceFilter(
+        choices=WirelessRoleChoices
+    )
 
     class Meta:
         model = InterfaceTemplate
-        fields = ['id', 'name', 'type', 'mgmt_only']
+        fields = ['id', 'name', 'type', 'enabled', 'mgmt_only', 'description']
 
 
 class FrontPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
@@ -694,7 +724,7 @@ class FrontPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeCo
 
     class Meta:
         model = FrontPortTemplate
-        fields = ['id', 'name', 'type', 'color']
+        fields = ['id', 'name', 'type', 'color', 'description']
 
 
 class RearPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeComponentFilterSet):
@@ -705,21 +735,21 @@ class RearPortTemplateFilterSet(ChangeLoggedModelFilterSet, ModularDeviceTypeCom
 
     class Meta:
         model = RearPortTemplate
-        fields = ['id', 'name', 'type', 'color', 'positions']
+        fields = ['id', 'name', 'type', 'color', 'positions', 'description']
 
 
 class ModuleBayTemplateFilterSet(ChangeLoggedModelFilterSet, DeviceTypeComponentFilterSet):
 
     class Meta:
         model = ModuleBayTemplate
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'description']
 
 
 class DeviceBayTemplateFilterSet(ChangeLoggedModelFilterSet, DeviceTypeComponentFilterSet):
 
     class Meta:
         model = DeviceBayTemplate
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'description']
 
 
 class InventoryItemTemplateFilterSet(ChangeLoggedModelFilterSet, DeviceTypeComponentFilterSet):
@@ -752,7 +782,7 @@ class InventoryItemTemplateFilterSet(ChangeLoggedModelFilterSet, DeviceTypeCompo
 
     class Meta:
         model = InventoryItemTemplate
-        fields = ['id', 'name', 'label', 'part_id']
+        fields = ['id', 'name', 'label', 'part_id', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -766,6 +796,10 @@ class InventoryItemTemplateFilterSet(ChangeLoggedModelFilterSet, DeviceTypeCompo
 
 
 class DeviceRoleFilterSet(OrganizationalModelFilterSet):
+    config_template_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ConfigTemplate.objects.all(),
+        label=_('Config template (ID)'),
+    )
 
     class Meta:
         model = DeviceRole
@@ -784,13 +818,23 @@ class PlatformFilterSet(OrganizationalModelFilterSet):
         to_field_name='slug',
         label=_('Manufacturer (slug)'),
     )
+    config_template_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ConfigTemplate.objects.all(),
+        label=_('Config template (ID)'),
+    )
 
     class Meta:
         model = Platform
-        fields = ['id', 'name', 'slug', 'napalm_driver', 'description']
+        fields = ['id', 'name', 'slug', 'description']
 
 
-class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilterSet, LocalConfigContextFilterSet):
+class DeviceFilterSet(
+    NetBoxModelFilterSet,
+    TenancyFilterSet,
+    ContactModelFilterSet,
+    LocalConfigContextFilterSet,
+    PrimaryIPFilterSet,
+):
     manufacturer_id = django_filters.ModelMultipleChoiceFilter(
         field_name='device_type__manufacturer',
         queryset=Manufacturer.objects.all(),
@@ -813,12 +857,12 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
         label=_('Device type (ID)'),
     )
     role_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='device_role_id',
+        field_name='role_id',
         queryset=DeviceRole.objects.all(),
         label=_('Role (ID)'),
     )
     role = django_filters.ModelMultipleChoiceFilter(
-        field_name='device_role__slug',
+        field_name='role__slug',
         queryset=DeviceRole.objects.all(),
         to_field_name='slug',
         label=_('Role (slug)'),
@@ -917,6 +961,10 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
         method='_has_primary_ip',
         label=_('Has a primary IP'),
     )
+    has_oob_ip = django_filters.BooleanFilter(
+        method='_has_oob_ip',
+        label=_('Has an out-of-band IP'),
+    )
     virtual_chassis_id = django_filters.ModelMultipleChoiceFilter(
         field_name='virtual_chassis',
         queryset=VirtualChassis.objects.all(),
@@ -925,6 +973,10 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
     virtual_chassis_member = django_filters.BooleanFilter(
         method='_virtual_chassis_member',
         label=_('Is a virtual chassis member')
+    )
+    config_template_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ConfigTemplate.objects.all(),
+        label=_('Config template (ID)'),
     )
     console_ports = django_filters.BooleanFilter(
         method='_console_ports',
@@ -958,20 +1010,18 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
         method='_device_bays',
         label=_('Has device bays'),
     )
-    primary_ip4_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='primary_ip4',
+    oob_ip_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='oob_ip',
         queryset=IPAddress.objects.all(),
-        label=_('Primary IPv4 (ID)'),
-    )
-    primary_ip6_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='primary_ip6',
-        queryset=IPAddress.objects.all(),
-        label=_('Primary IPv6 (ID)'),
+        label=_('OOB IP (ID)'),
     )
 
     class Meta:
         model = Device
-        fields = ['id', 'asset_tag', 'face', 'position', 'airflow', 'vc_position', 'vc_priority']
+        fields = [
+            'id', 'asset_tag', 'face', 'position', 'latitude', 'longitude', 'airflow', 'vc_position', 'vc_priority',
+            'description',
+        ]
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -981,11 +1031,20 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
             Q(serial__icontains=value.strip()) |
             Q(inventoryitems__serial__icontains=value.strip()) |
             Q(asset_tag__icontains=value.strip()) |
-            Q(comments__icontains=value)
+            Q(description__icontains=value.strip()) |
+            Q(comments__icontains=value) |
+            Q(primary_ip4__address__startswith=value) |
+            Q(primary_ip6__address__startswith=value)
         ).distinct()
 
     def _has_primary_ip(self, queryset, name, value):
         params = Q(primary_ip4__isnull=False) | Q(primary_ip6__isnull=False)
+        if value:
+            return queryset.filter(params)
+        return queryset.exclude(params)
+
+    def _has_oob_ip(self, queryset, name, value):
+        params = Q(oob_ip__isnull=False)
         if value:
             return queryset.filter(params)
         return queryset.exclude(params)
@@ -1021,7 +1080,7 @@ class DeviceFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilter
         return queryset.exclude(devicebays__isnull=value)
 
 
-class VirtualDeviceContextFilterSet(NetBoxModelFilterSet, TenancyFilterSet):
+class VirtualDeviceContextFilterSet(NetBoxModelFilterSet, TenancyFilterSet, PrimaryIPFilterSet):
     device_id = django_filters.ModelMultipleChoiceFilter(
         field_name='device',
         queryset=Device.objects.all(),
@@ -1042,15 +1101,21 @@ class VirtualDeviceContextFilterSet(NetBoxModelFilterSet, TenancyFilterSet):
 
     class Meta:
         model = VirtualDeviceContext
-        fields = ['id', 'device', 'name']
+        fields = ['id', 'device', 'name', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(
+
+        qs_filter = (
             Q(name__icontains=value) |
-            Q(identifier=value.strip())
-        ).distinct()
+            Q(description__icontains=value)
+        )
+        try:
+            qs_filter |= Q(identifier=int(value))
+        except ValueError:
+            pass
+        return queryset.filter(qs_filter).distinct()
 
     def _has_primary_ip(self, queryset, name, value):
         params = Q(primary_ip4__isnull=False) | Q(primary_ip6__isnull=False)
@@ -1102,7 +1167,7 @@ class ModuleFilterSet(NetBoxModelFilterSet):
 
     class Meta:
         model = Module
-        fields = ['id', 'status', 'asset_tag']
+        fields = ['id', 'status', 'asset_tag', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -1111,6 +1176,7 @@ class ModuleFilterSet(NetBoxModelFilterSet):
             Q(device__name__icontains=value.strip()) |
             Q(serial__icontains=value.strip()) |
             Q(asset_tag__icontains=value.strip()) |
+            Q(description__icontains=value) |
             Q(comments__icontains=value)
         ).distinct()
 
@@ -1189,6 +1255,28 @@ class DeviceComponentFilterSet(django_filters.FilterSet):
         to_field_name='name',
         label=_('Device (name)'),
     )
+    device_type_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__device_type',
+        queryset=DeviceType.objects.all(),
+        label=_('Device type (ID)'),
+    )
+    device_type = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__device_type__model',
+        queryset=DeviceType.objects.all(),
+        to_field_name='model',
+        label=_('Device type (model)'),
+    )
+    role_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__role',
+        queryset=DeviceRole.objects.all(),
+        label=_('Device role (ID)'),
+    )
+    role = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__role__slug',
+        queryset=DeviceRole.objects.all(),
+        to_field_name='slug',
+        label=_('Device role (slug)'),
+    )
     virtual_chassis_id = django_filters.ModelMultipleChoiceFilter(
         field_name='device__virtual_chassis',
         queryset=VirtualChassis.objects.all(),
@@ -1199,6 +1287,18 @@ class DeviceComponentFilterSet(django_filters.FilterSet):
         queryset=VirtualChassis.objects.all(),
         to_field_name='name',
         label=_('Virtual Chassis'),
+    )
+    # TODO: Remove in v4.0
+    device_role_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__role',
+        queryset=DeviceRole.objects.all(),
+        label=_('Device role (ID)'),
+    )
+    device_role = django_filters.ModelMultipleChoiceFilter(
+        field_name='device__role__slug',
+        queryset=DeviceRole.objects.all(),
+        to_field_name='slug',
+        label=_('Device role (slug)'),
     )
 
     def search(self, queryset, name, value):
@@ -1319,23 +1419,73 @@ class PowerOutletFilterSet(
         fields = ['id', 'name', 'label', 'feed_leg', 'description', 'cable_end']
 
 
+class CommonInterfaceFilterSet(django_filters.FilterSet):
+    vlan_id = django_filters.CharFilter(
+        method='filter_vlan_id',
+        label=_('Assigned VLAN')
+    )
+    vlan = django_filters.CharFilter(
+        method='filter_vlan',
+        label=_('Assigned VID')
+    )
+    vrf_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='vrf',
+        queryset=VRF.objects.all(),
+        label=_('VRF'),
+    )
+    vrf = django_filters.ModelMultipleChoiceFilter(
+        field_name='vrf__rd',
+        queryset=VRF.objects.all(),
+        to_field_name='rd',
+        label=_('VRF (RD)'),
+    )
+    l2vpn_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='l2vpn_terminations__l2vpn',
+        queryset=L2VPN.objects.all(),
+        label=_('L2VPN (ID)'),
+    )
+    l2vpn = django_filters.ModelMultipleChoiceFilter(
+        field_name='l2vpn_terminations__l2vpn__identifier',
+        queryset=L2VPN.objects.all(),
+        to_field_name='identifier',
+        label=_('L2VPN'),
+    )
+
+    def filter_vlan_id(self, queryset, name, value):
+        value = value.strip()
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(untagged_vlan_id=value) |
+            Q(tagged_vlans=value)
+        )
+
+    def filter_vlan(self, queryset, name, value):
+        value = value.strip()
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(untagged_vlan_id__vid=value) |
+            Q(tagged_vlans__vid=value)
+        )
+
+
 class InterfaceFilterSet(
     ModularDeviceComponentFilterSet,
     NetBoxModelFilterSet,
     CabledObjectFilterSet,
-    PathEndpointFilterSet
+    PathEndpointFilterSet,
+    CommonInterfaceFilterSet
 ):
-    # Override device and device_id filters from DeviceComponentFilterSet to match against any peer virtual chassis
-    # members
-    device = MultiValueCharFilter(
-        method='filter_device',
+    virtual_chassis_member = MultiValueCharFilter(
+        method='filter_virtual_chassis_member',
         field_name='name',
-        label=_('Device'),
+        label=_('Virtual Chassis Interfaces for Device')
     )
-    device_id = MultiValueNumberFilter(
-        method='filter_device_id',
+    virtual_chassis_member_id = MultiValueNumberFilter(
+        method='filter_virtual_chassis_member',
         field_name='pk',
-        label=_('Device (ID)'),
+        label=_('Virtual Chassis Interfaces for Device (ID)')
     )
     kind = django_filters.CharFilter(
         method='filter_kind',
@@ -1368,14 +1518,6 @@ class InterfaceFilterSet(
     poe_type = django_filters.MultipleChoiceFilter(
         choices=InterfacePoETypeChoices
     )
-    vlan_id = django_filters.CharFilter(
-        method='filter_vlan_id',
-        label=_('Assigned VLAN')
-    )
-    vlan = django_filters.CharFilter(
-        method='filter_vlan',
-        label=_('Assigned VID')
-    )
     type = django_filters.MultipleChoiceFilter(
         choices=InterfaceTypeChoices,
         null_value=None
@@ -1385,17 +1527,6 @@ class InterfaceFilterSet(
     )
     rf_channel = django_filters.MultipleChoiceFilter(
         choices=WirelessChannelChoices
-    )
-    vrf_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='vrf',
-        queryset=VRF.objects.all(),
-        label=_('VRF'),
-    )
-    vrf = django_filters.ModelMultipleChoiceFilter(
-        field_name='vrf__rd',
-        queryset=VRF.objects.all(),
-        to_field_name='rd',
-        label=_('VRF (RD)'),
     )
     vdc_id = django_filters.ModelMultipleChoiceFilter(
         field_name='vdcs',
@@ -1414,17 +1545,6 @@ class InterfaceFilterSet(
         to_field_name='name',
         label='Virtual Device Context',
     )
-    l2vpn_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='l2vpn_terminations__l2vpn',
-        queryset=L2VPN.objects.all(),
-        label=_('L2VPN (ID)'),
-    )
-    l2vpn = django_filters.ModelMultipleChoiceFilter(
-        field_name='l2vpn_terminations__l2vpn__identifier',
-        queryset=L2VPN.objects.all(),
-        to_field_name='identifier',
-        label=_('L2VPN'),
-    )
 
     class Meta:
         model = Interface
@@ -1433,44 +1553,14 @@ class InterfaceFilterSet(
             'rf_channel', 'rf_channel_frequency', 'rf_channel_width', 'tx_power', 'description', 'cable_end',
         ]
 
-    def filter_device(self, queryset, name, value):
+    def filter_virtual_chassis_member(self, queryset, name, value):
         try:
-            devices = Device.objects.filter(**{'{}__in'.format(name): value})
             vc_interface_ids = []
-            for device in devices:
-                vc_interface_ids.extend(device.vc_interfaces().values_list('id', flat=True))
+            for device in Device.objects.filter(**{f'{name}__in': value}):
+                vc_interface_ids.extend(device.vc_interfaces(if_master=False).values_list('id', flat=True))
             return queryset.filter(pk__in=vc_interface_ids)
         except Device.DoesNotExist:
             return queryset.none()
-
-    def filter_device_id(self, queryset, name, id_list):
-        # Include interfaces belonging to peer virtual chassis members
-        vc_interface_ids = []
-        try:
-            devices = Device.objects.filter(pk__in=id_list)
-            for device in devices:
-                vc_interface_ids += device.vc_interfaces(if_master=False).values_list('id', flat=True)
-            return queryset.filter(pk__in=vc_interface_ids)
-        except Device.DoesNotExist:
-            return queryset.none()
-
-    def filter_vlan_id(self, queryset, name, value):
-        value = value.strip()
-        if not value:
-            return queryset
-        return queryset.filter(
-            Q(untagged_vlan_id=value) |
-            Q(tagged_vlans=value)
-        )
-
-    def filter_vlan(self, queryset, name, value):
-        value = value.strip()
-        if not value:
-            return queryset
-        return queryset.filter(
-            Q(untagged_vlan_id__vid=value) |
-            Q(tagged_vlans__vid=value)
-        )
 
     def filter_kind(self, queryset, name, value):
         value = value.strip().lower()
@@ -1577,7 +1667,7 @@ class InventoryItemRoleFilterSet(OrganizationalModelFilterSet):
 
     class Meta:
         model = InventoryItemRole
-        fields = ['id', 'name', 'slug', 'color']
+        fields = ['id', 'name', 'slug', 'color', 'description']
 
 
 class VirtualChassisFilterSet(NetBoxModelFilterSet):
@@ -1642,13 +1732,14 @@ class VirtualChassisFilterSet(NetBoxModelFilterSet):
 
     class Meta:
         model = VirtualChassis
-        fields = ['id', 'domain', 'name']
+        fields = ['id', 'domain', 'name', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         qs_filter = (
             Q(name__icontains=value) |
+            Q(description__icontains=value) |
             Q(members__name__icontains=value) |
             Q(domain__icontains=value)
         )
@@ -1660,13 +1751,19 @@ class CableFilterSet(TenancyFilterSet, NetBoxModelFilterSet):
         field_name='terminations__termination_type'
     )
     termination_a_id = MultiValueNumberFilter(
+        method='filter_by_cable_end_a',
         field_name='terminations__termination_id'
     )
     termination_b_type = ContentTypeFilter(
         field_name='terminations__termination_type'
     )
     termination_b_id = MultiValueNumberFilter(
+        method='filter_by_cable_end_b',
         field_name='terminations__termination_id'
+    )
+    unterminated = django_filters.BooleanFilter(
+        method='_unterminated',
+        label=_('Unterminated'),
     )
     type = django_filters.MultipleChoiceFilter(
         choices=CableTypeChoices
@@ -1709,22 +1806,117 @@ class CableFilterSet(TenancyFilterSet, NetBoxModelFilterSet):
         field_name='site__slug'
     )
 
+    # Termination object filters
+    consoleport_id = MultiValueNumberFilter(
+        method='filter_by_consoleport'
+    )
+    consoleserverport_id = MultiValueNumberFilter(
+        method='filter_by_consoleserverport'
+    )
+    powerport_id = MultiValueNumberFilter(
+        method='filter_by_powerport'
+    )
+    poweroutlet_id = MultiValueNumberFilter(
+        method='filter_by_poweroutlet'
+    )
+    interface_id = MultiValueNumberFilter(
+        method='filter_by_interface'
+    )
+    frontport_id = MultiValueNumberFilter(
+        method='filter_by_frontport'
+    )
+    rearport_id = MultiValueNumberFilter(
+        method='filter_by_rearport'
+    )
+    powerfeed_id = MultiValueNumberFilter(
+        method='filter_by_powerfeed'
+    )
+    circuittermination_id = MultiValueNumberFilter(
+        method='filter_by_circuittermination'
+    )
+
     class Meta:
         model = Cable
-        fields = ['id', 'label', 'length', 'length_unit']
+        fields = ['id', 'label', 'length', 'length_unit', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(label__icontains=value)
+        qs_filter = (
+            Q(label__icontains=value) |
+            Q(description__icontains=value)
+        )
+        return queryset.filter(qs_filter)
 
     def filter_by_termination(self, queryset, name, value):
         # Filter by a related object cached on CableTermination. Note the underscore preceding the field name.
         # Supported objects: device, rack, location, site
         return queryset.filter(**{f'terminations___{name}__in': value}).distinct()
 
+    def filter_by_cable_end(self, queryset, name, value, side):
+        # Filter by termination id and cable_end type
+        return queryset.filter(**{f'{name}__in': value, 'terminations__cable_end': side}).distinct()
+
+    def filter_by_cable_end_a(self, queryset, name, value):
+        # Filter by termination id and cable_end type
+        return self.filter_by_cable_end(queryset, name, value, CableEndChoices.SIDE_A)
+
+    def filter_by_cable_end_b(self, queryset, name, value):
+        # Filter by termination id and cable_end type
+        return self.filter_by_cable_end(queryset, name, value, CableEndChoices.SIDE_B)
+
+    def _unterminated(self, queryset, name, value):
+        if value:
+            terminated_ids = (
+                queryset.filter(terminations__cable_end=CableEndChoices.SIDE_A)
+                .filter(terminations__cable_end=CableEndChoices.SIDE_B)
+                .values("id")
+            )
+            return queryset.exclude(id__in=terminated_ids)
+        else:
+            return queryset.filter(terminations__cable_end=CableEndChoices.SIDE_A).filter(
+                terminations__cable_end=CableEndChoices.SIDE_B
+            )
+
+    def filter_by_termination_object(self, queryset, model, value):
+        # Filter by specific termination object(s)
+        content_type = ContentType.objects.get_for_model(model)
+        cable_ids = CableTermination.objects.filter(
+            termination_type=content_type,
+            termination_id__in=value
+        ).values_list('cable', flat=True)
+        return queryset.filter(pk__in=cable_ids)
+
+    def filter_by_consoleport(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, ConsolePort, value)
+
+    def filter_by_consoleserverport(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, ConsoleServerPort, value)
+
+    def filter_by_powerport(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, PowerPort, value)
+
+    def filter_by_poweroutlet(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, PowerOutlet, value)
+
+    def filter_by_interface(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, Interface, value)
+
+    def filter_by_frontport(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, FrontPort, value)
+
+    def filter_by_rearport(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, RearPort, value)
+
+    def filter_by_powerfeed(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, PowerFeed, value)
+
+    def filter_by_circuittermination(self, queryset, name, value):
+        return self.filter_by_termination_object(queryset, CircuitTermination, value)
+
 
 class CableTerminationFilterSet(BaseFilterSet):
+    termination_type = ContentTypeFilter()
 
     class Meta:
         model = CableTermination
@@ -1777,18 +1969,19 @@ class PowerPanelFilterSet(NetBoxModelFilterSet, ContactModelFilterSet):
 
     class Meta:
         model = PowerPanel
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         qs_filter = (
-            Q(name__icontains=value)
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
         )
         return queryset.filter(qs_filter)
 
 
-class PowerFeedFilterSet(NetBoxModelFilterSet, CabledObjectFilterSet, PathEndpointFilterSet):
+class PowerFeedFilterSet(NetBoxModelFilterSet, CabledObjectFilterSet, PathEndpointFilterSet, TenancyFilterSet):
     region_id = TreeNodeMultipleChoiceFilter(
         queryset=Region.objects.all(),
         field_name='power_panel__site__region',
@@ -1844,6 +2037,7 @@ class PowerFeedFilterSet(NetBoxModelFilterSet, CabledObjectFilterSet, PathEndpoi
         model = PowerFeed
         fields = [
             'id', 'name', 'status', 'type', 'supply', 'phase', 'voltage', 'amperage', 'max_utilization', 'cable_end',
+            'description',
         ]
 
     def search(self, queryset, name, value):
@@ -1851,6 +2045,8 @@ class PowerFeedFilterSet(NetBoxModelFilterSet, CabledObjectFilterSet, PathEndpoi
             return queryset
         qs_filter = (
             Q(name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(power_panel__name__icontains=value) |
             Q(comments__icontains=value)
         )
         return queryset.filter(qs_filter)

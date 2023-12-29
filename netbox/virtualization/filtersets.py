@@ -2,19 +2,22 @@ import django_filters
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
+from dcim.filtersets import CommonInterfaceFilterSet
 from dcim.models import Device, DeviceRole, Platform, Region, Site, SiteGroup
 from extras.filtersets import LocalConfigContextFilterSet
-from ipam.models import L2VPN, VRF
+from extras.models import ConfigTemplate
+from ipam.filtersets import PrimaryIPFilterSet
 from netbox.filtersets import OrganizationalModelFilterSet, NetBoxModelFilterSet
 from tenancy.filtersets import TenancyFilterSet, ContactModelFilterSet
 from utilities.filters import MultiValueCharFilter, MultiValueMACAddressFilter, TreeNodeMultipleChoiceFilter
 from .choices import *
-from .models import Cluster, ClusterGroup, ClusterType, VirtualMachine, VMInterface
+from .models import *
 
 __all__ = (
     'ClusterFilterSet',
     'ClusterGroupFilterSet',
     'ClusterTypeFilterSet',
+    'VirtualDiskFilterSet',
     'VirtualMachineFilterSet',
     'VMInterfaceFilterSet',
 )
@@ -98,13 +101,14 @@ class ClusterFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFilte
 
     class Meta:
         model = Cluster
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
+            Q(description__icontains=value) |
             Q(comments__icontains=value)
         )
 
@@ -113,7 +117,8 @@ class VirtualMachineFilterSet(
     NetBoxModelFilterSet,
     TenancyFilterSet,
     ContactModelFilterSet,
-    LocalConfigContextFilterSet
+    LocalConfigContextFilterSet,
+    PrimaryIPFilterSet,
 ):
     status = django_filters.MultipleChoiceFilter(
         choices=VirtualMachineStatusChoices,
@@ -228,17 +233,24 @@ class VirtualMachineFilterSet(
         method='_has_primary_ip',
         label=_('Has a primary IP'),
     )
+    config_template_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ConfigTemplate.objects.all(),
+        label=_('Config template (ID)'),
+    )
 
     class Meta:
         model = VirtualMachine
-        fields = ['id', 'cluster', 'vcpus', 'memory', 'disk']
+        fields = ['id', 'cluster', 'vcpus', 'memory', 'disk', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(comments__icontains=value)
+            Q(description__icontains=value) |
+            Q(comments__icontains=value) |
+            Q(primary_ip4__address__startswith=value) |
+            Q(primary_ip6__address__startswith=value)
         )
 
     def _has_primary_ip(self, queryset, name, value):
@@ -248,7 +260,7 @@ class VirtualMachineFilterSet(
         return queryset.exclude(params)
 
 
-class VMInterfaceFilterSet(NetBoxModelFilterSet):
+class VMInterfaceFilterSet(NetBoxModelFilterSet, CommonInterfaceFilterSet):
     cluster_id = django_filters.ModelMultipleChoiceFilter(
         field_name='virtual_machine__cluster',
         queryset=Cluster.objects.all(),
@@ -284,32 +296,36 @@ class VMInterfaceFilterSet(NetBoxModelFilterSet):
     mac_address = MultiValueMACAddressFilter(
         label=_('MAC address'),
     )
-    vrf_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='vrf',
-        queryset=VRF.objects.all(),
-        label=_('VRF'),
-    )
-    vrf = django_filters.ModelMultipleChoiceFilter(
-        field_name='vrf__rd',
-        queryset=VRF.objects.all(),
-        to_field_name='rd',
-        label=_('VRF (RD)'),
-    )
-    l2vpn_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='l2vpn_terminations__l2vpn',
-        queryset=L2VPN.objects.all(),
-        label=_('L2VPN (ID)'),
-    )
-    l2vpn = django_filters.ModelMultipleChoiceFilter(
-        field_name='l2vpn_terminations__l2vpn__identifier',
-        queryset=L2VPN.objects.all(),
-        to_field_name='identifier',
-        label=_('L2VPN'),
-    )
 
     class Meta:
         model = VMInterface
         fields = ['id', 'name', 'enabled', 'mtu', 'description']
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        )
+
+
+class VirtualDiskFilterSet(NetBoxModelFilterSet):
+    virtual_machine_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='virtual_machine',
+        queryset=VirtualMachine.objects.all(),
+        label=_('Virtual machine (ID)'),
+    )
+    virtual_machine = django_filters.ModelMultipleChoiceFilter(
+        field_name='virtual_machine__name',
+        queryset=VirtualMachine.objects.all(),
+        to_field_name='name',
+        label=_('Virtual machine'),
+    )
+
+    class Meta:
+        model = VirtualDisk
+        fields = ['id', 'name', 'size', 'description']
 
     def search(self, queryset, name, value):
         if not value.strip():

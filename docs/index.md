@@ -1,6 +1,6 @@
 ![NetBox](netbox_logo.svg "NetBox logo"){style="height: 100px; margin-bottom: 3em"}
 
-# The Premiere Network Source of Truth
+# The Premier Network Source of Truth
 
 NetBox is the leading solution for modeling and documenting modern networks. By combining the traditional disciplines of IP address management (IPAM) and datacenter infrastructure management (DCIM) with powerful APIs and extensions, NetBox provides the ideal "source of truth" to power network automation. Read on to discover why thousands of organizations worldwide put NetBox at the heart of their infrastructure.
 
@@ -32,7 +32,7 @@ In addition to its expansive and robust data model, NetBox offers myriad mechani
 * Custom fields
 * Custom model validation
 * Export templates
-* Webhooks
+* Event rules
 * Plugins
 * REST & GraphQL APIs
 
@@ -52,4 +52,4 @@ NetBox is built on the enormously popular [Django](http://www.djangoproject.com/
 * Try out our [public demo](https://demo.netbox.dev/) if you want to jump right in
 * The [installation guide](./installation/index.md) will help you get your own deployment up and running
 * Or try the community [Docker image](https://github.com/netbox-community/netbox-docker) for a low-touch approach
-* [NetBox Cloud](https://www.getnetbox.io/) is a hosted solution offered by NS1
+* [NetBox Cloud](https://netboxlabs.com/netbox-cloud) is a managed solution offered by [NetBox Labs](https://netboxlabs.com/)
